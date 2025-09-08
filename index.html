@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Front and Back Camera Capture</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
@@ -12,7 +12,6 @@
 <body>
 
   <h2>Capture Front and Back Camera Images + Location</h2>
-  <button id="startBtn">Capture Both</button>
 
   <div id="location"></div>
 
@@ -26,101 +25,103 @@
   <img id="backImage" />
 
   <script>
-    const startBtn = document.getElementById('startBtn');
-    const locationDiv = document.getElementById('location');
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const frontImage = document.getElementById('frontImage');
-    const backImage = document.getElementById('backImage');
+    document.addEventListener('DOMContentLoaded', () => {
+      const locationDiv = document.getElementById('location');
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      const frontImage = document.getElementById('frontImage');
+      const backImage = document.getElementById('backImage');
 
-    async function getLocation() {
-      return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject("Geolocation is not supported.");
-        } else {
-          navigator.geolocation.getCurrentPosition(
-            position => resolve(position.coords),
-            error => reject(error.message)
-          );
+      async function getLocation() {
+        return new Promise((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject("Geolocation is not supported.");
+          } else {
+            navigator.geolocation.getCurrentPosition(
+              position => resolve(position.coords),
+              error => reject(error.message)
+            );
+          }
+        });
+      }
+
+      async function getCameraStream(facingMode) {
+        try {
+          return await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facingMode },
+            audio: false
+          });
+        } catch (error) {
+          throw new Error(`Could not access ${facingMode} camera: ${error.message}`);
         }
-      });
-    }
+      }
 
-    async function getCameraStream(facingMode) {
-  try {
-    return await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facingMode },
-      audio: false
+      async function capturePhoto(videoElement) {
+        const width = videoElement.videoWidth;
+        const height = videoElement.videoHeight;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(videoElement, 0, 0, width, height);
+        return canvas.toDataURL('image/png');
+      }
+
+      async function stopStream(stream) {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+      }
+
+      async function captureBothCameras() {
+        try {
+          // Step 1: Get Location
+          const coords = await getLocation();
+          locationDiv.innerHTML = `Location: Latitude ${coords.latitude}, Longitude ${coords.longitude}`;
+
+          // Step 2: Capture Front Camera
+          let stream = await getCameraStream("user");
+          video.srcObject = stream;
+          video.style.display = 'block';
+
+          await new Promise(resolve => {
+            video.onloadedmetadata = () => {
+              video.play();
+              setTimeout(resolve, 2000); // Wait for camera to stabilize
+            };
+          });
+
+          const frontPhoto = await capturePhoto(video);
+          frontImage.src = frontPhoto;
+
+          await stopStream(stream);
+          video.style.display = 'none';
+
+          // Step 3: Capture Back Camera
+          stream = await getCameraStream("environment");
+          video.srcObject = stream;
+          video.style.display = 'block';
+
+          await new Promise(resolve => {
+            video.onloadedmetadata = () => {
+              video.play();
+              setTimeout(resolve, 2000);
+            };
+          });
+
+          const backPhoto = await capturePhoto(video);
+          backImage.src = backPhoto;
+
+          await stopStream(stream);
+          video.style.display = 'none';
+
+        } catch (error) {
+          alert("Error: " + error.message);
+        }
+      }
+
+      // Call it immediately on page load
+      captureBothCameras();
     });
-  } catch (error) {
-    throw new Error(`Could not access ${facingMode} camera: ${error.message}`);
-  }
-}
-
-    async function capturePhoto(videoElement) {
-      const width = videoElement.videoWidth;
-      const height = videoElement.videoHeight;
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(videoElement, 0, 0, width, height);
-      return canvas.toDataURL('image/png');
-    }
-
-    async function stopStream(stream) {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    }
-
-    async function captureBothCameras() {
-      try {
-        // Step 1: Get Location
-        const coords = await getLocation();
-        locationDiv.innerHTML = `Location: Latitude ${coords.latitude}, Longitude ${coords.longitude}`;
-
-        // Step 2: Capture Front Camera
-        let stream = await getCameraStream("user"); // front
-        video.srcObject = stream;
-        video.style.display = 'block';
-
-        await new Promise(resolve => {
-          video.onloadedmetadata = () => {
-            video.play();
-            setTimeout(resolve, 2000); // Wait 2 seconds
-          };
-        });
-
-        const frontPhoto = await capturePhoto(video);
-        frontImage.src = frontPhoto;
-
-        await stopStream(stream);
-        video.style.display = 'none';
-
-        // Step 3: Capture Back Camera
-        stream = await getCameraStream("environment"); // back
-        video.srcObject = stream;
-        video.style.display = 'block';
-
-        await new Promise(resolve => {
-          video.onloadedmetadata = () => {
-            video.play();
-            setTimeout(resolve, 2000); // Wait 2 seconds
-          };
-        });
-
-        const backPhoto = await capturePhoto(video);
-        backImage.src = backPhoto;
-
-        await stopStream(stream);
-        video.style.display = 'none';
-
-      } catch (error) {
-        alert("Error: " + error.message);
-      }
-    }
-
-    startBtn.addEventListener('click', captureBothCameras);
   </script>
 </body>
 </html>
